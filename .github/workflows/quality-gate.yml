@@ -1,0 +1,121 @@
+name: Quality gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  static:
+    name: Typecheck · Lint · Unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test:unit
+
+  build-and-integration:
+    name: Build · Integration
+    runs-on: ubuntu-latest
+    needs: static
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app_test
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ["5432:5432"]
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/app_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm build
+      - run: pnpm test:integration
+      - name: Bundle budget
+        run: node scripts/check-bundle-budget.mjs
+
+  e2e:
+    name: E2E · Accessibility
+    runs-on: ubuntu-latest
+    needs: build-and-integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - run: pnpm test:a11y
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  guardrails:
+    name: Design-system and security guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Registry files must not be hand-edited
+        run: |
+          if git diff --name-only origin/${{ github.base_ref || 'main' }}...HEAD \
+             | grep -q '^components/ui/'; then
+            echo "::error::components/ui/** is registry-owned. Regenerate with the shadcn CLI."
+            exit 1
+          fi
+      - name: No arbitrary Tailwind values or raw colours in the diff
+        run: |
+          DIFF=$(git diff -U0 origin/${{ github.base_ref || 'main' }}...HEAD -- '*.tsx' '*.ts' || true)
+          if printf '%s' "$DIFF" | grep -E '^\+' | grep -Eq '(class(Name)?="[^"]*\[[0-9]+(px|rem)\]|#[0-9a-fA-F]{6}|rgb\()'; then
+            echo "::error::Raw colour or arbitrary value found. Use preset tokens (docs/standards/20-design-system.md)."
+            exit 1
+          fi
+      - name: No escape hatches without justification
+        run: |
+          git diff -U0 origin/${{ github.base_ref || 'main' }}...HEAD -- '*.ts' '*.tsx' \
+            | grep -E '^\+' > /tmp/added.txt || true
+          FAIL=0
+          if grep -Eq ':[[:space:]]*any([^A-Za-z]|$)' /tmp/added.txt; then
+            echo "::error::'any' introduced. Type it properly."; FAIL=1
+          fi
+          if grep -F '@ts-expect-error' /tmp/added.txt | grep -vq '#'; then
+            echo "::error::@ts-expect-error without an issue link (#123)."; FAIL=1
+          fi
+          if grep -F 'eslint-disable' /tmp/added.txt | grep -vq -- '--'; then
+            echo "::error::eslint-disable without an inline justification (-- reason)."; FAIL=1
+          fi
+          exit $FAIL
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high

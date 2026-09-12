@@ -1,0 +1,86 @@
+/* ---------------------------------------------------------------------------
+ * Semantic status layer — ADR-0002
+ *
+ * The installed preset is fully monochrome: every token is oklch(L 0 0) except
+ * --destructive. That gives no way to signal state at a glance, which a BTP app
+ * needs constantly (devis accepté / en attente / refusé, chantier en retard,
+ * réserve non levée). These tokens add that one channel and nothing else.
+ *
+ * Rules:
+ *   - Use ONLY for state information. Never for decoration, branding or layout.
+ *   - Never as the sole carrier of meaning: always icon + French label as well
+ *     (docs/standards/60-accessibility.md).
+ *   - Never override a preset token here. This layer sits beside it.
+ *
+ * Paste the three blocks below into app/globals.css, each into its existing
+ * matching block (@theme inline, :root, .dark). Do not create new blocks.
+ * -------------------------------------------------------------------------*/
+
+
+/* --- 1. into the existing @theme inline { } block ------------------------- */
+
+    --color-status-success: var(--status-success);
+    --color-status-success-bg: var(--status-success-bg);
+    --color-status-warning: var(--status-warning);
+    --color-status-warning-bg: var(--status-warning-bg);
+    --color-status-danger: var(--status-danger);
+    --color-status-danger-bg: var(--status-danger-bg);
+    --color-status-info: var(--status-info);
+    --color-status-info-bg: var(--status-info-bg);
+
+
+/* --- 2. into the existing :root { } block (light theme) ------------------- */
+
+    /* text, icon and border colour — sits on its own -bg or on --background */
+    --status-success: oklch(0.48 0.13 150);
+    --status-warning: oklch(0.50 0.13 75);
+    --status-danger: oklch(0.505 0.21 27.3);
+    --status-info: oklch(0.49 0.15 255);
+    /* surface tint for badges and rows */
+    --status-success-bg: oklch(0.95 0.03 150);
+    --status-warning-bg: oklch(0.95 0.04 75);
+    --status-danger-bg: oklch(0.95 0.03 27.3);
+    --status-info-bg: oklch(0.95 0.03 255);
+
+    /* Distinguishable chart palette. The preset's --chart-1..5 are five greys,
+     * unreadable past two series. Keep the preset tokens for monochrome charts
+     * and use these when a chart has three or more series. */
+    --chart-cat-1: oklch(0.55 0.15 255);
+    --chart-cat-2: oklch(0.58 0.14 150);
+    --chart-cat-3: oklch(0.62 0.15 75);
+    --chart-cat-4: oklch(0.55 0.18 20);
+    --chart-cat-5: oklch(0.52 0.14 300);
+
+
+/* --- 3. into the existing .dark { } block --------------------------------- */
+
+    --status-success: oklch(0.80 0.14 150);
+    --status-warning: oklch(0.82 0.14 75);
+    --status-danger: oklch(0.75 0.17 27.3);
+    --status-info: oklch(0.78 0.13 255);
+    --status-success-bg: oklch(0.27 0.04 150);
+    --status-warning-bg: oklch(0.28 0.05 75);
+    --status-danger-bg: oklch(0.27 0.05 27.3);
+    --status-info-bg: oklch(0.27 0.04 255);
+
+    --chart-cat-1: oklch(0.70 0.14 255);
+    --chart-cat-2: oklch(0.72 0.13 150);
+    --chart-cat-3: oklch(0.76 0.14 75);
+    --chart-cat-4: oklch(0.68 0.16 20);
+    --chart-cat-5: oklch(0.68 0.13 300);
+
+
+/* --- Usage -----------------------------------------------------------------
+ *
+ *   <Badge className="bg-status-success-bg text-status-success border-status-success/25">
+ *     <CheckCircle2 /> Accepté
+ *   </Badge>
+ *
+ * The icon and the word carry the meaning; the colour only accelerates reading.
+ * Remove the colour and the badge must still be unambiguous — that is the test.
+ *
+ * CONTRAST: these values target ≥ 4.5:1 for the text colour on its own -bg and
+ * on --background, in both themes. They are starting values, not measured ones.
+ * Verify them once with a contrast checker before the first UI story and adjust
+ * the L component if needed; accessibility-auditor blocks on a real failure.
+ * -------------------------------------------------------------------------*/

@@ -1,0 +1,8 @@
+# Autonomous loop policy — human checkpoints.
+#
+# One line per story id that must NOT run unattended. The loop halts before dispatching it.
+# Put every story here that touches: authentication, the tenancy layer, money computation,
+# a migration on a populated table, or a regulatory rule.
+#
+# checkpoint: 1-3-auth-session
+# checkpoint: 2-1-situation-calcul
