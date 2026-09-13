@@ -1,0 +1,105 @@
+- id: "1"
+  title: Database, migrations, and the typed organisation scope
+  description: >-
+    Stand up Postgres and Drizzle, create the `organisation` table, and build the OrgScope
+    object that CAP-3 requires — calling a `lib/db/` query without it is a compile error.
+    Enable RLS on every tenant-scoped table as the second line.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    This story builds the boundary every later story trusts. Record the multi-tenancy ADR
+    that 10-architecture.md lists as owed before the first line of feature code: shared
+    schema with org_id plus RLS, and what schema-per-tenant would have bought instead.
+    Pushing a schema straight to a database without a migration file is banned outside a
+    throwaway local one and a hook blocks it — generate the SQL, read it, and give the
+    migration the header comment that 70-data-and-migrations.md requires. Prove the compile
+    error with a type-level test, not with prose: a query call missing its scope must fail
+    `pnpm typecheck`. Identifiers are UUID v7 generated client-side, per ADR-0006.
+- id: "2"
+  title: Accounts, sessions and self-service signup
+  description: >-
+    CAP-1 and CAP-2. One submission creates organisation, user and an empty company-settings
+    row in a single transaction; sign-in and sign-out with a server-revocable session.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    Three ADRs land here, each short: the password KDF and its parameters (its cost is
+    excluded from the 300 ms budget and must not be tuned down to fit one); the MFA deferral
+    with its deadline; and the RGPD deferral, whose trigger is observable rather than a
+    milestone — before the second paying organisation is onboarded, or on the first user
+    request, whichever comes first. Ship the two things that make the RGPD retrofit possible:
+    a creation timestamp and a stable subject identifier on `user_account`. The six-role enum
+    ships in full; only `admin` is assignable. Unknown email and wrong password must be
+    indistinguishable in response, shape and timing class — test that, do not assert it.
+- id: "3"
+  title: Password reset
+  description: >-
+    CAP-7. Request and consume a single-use, short-lived token that sets a new password and
+    revokes every existing session for that user.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    This is E0's only operation that resolves an organisation without a session, and SPEC.md
+    names it as the single cross-tenant surface: look the token up by hash across all
+    organisations, then adopt the organisation from the token's user *after* the token
+    verifies — never from caller input. Store a hash, never the token. Expired, consumed,
+    unknown and malformed tokens all fail closed with one identical message. No transactional
+    email provider is chosen yet; choosing one is an ADR in this story, and the send path must
+    not leak whether an address resolves to a user.
+- id: "4"
+  title: Company legal identity settings
+  description: >-
+    CAP-4. The eleven fields of company-legal-identity.md, stored as structured columns with
+    exactly one input each, round-tripping SoRenov's real values unchanged.
+  invoke_dev_with: >-
+    The companion `company-legal-identity.md` is the contract, including the defect it exists
+    to prevent: both source devis print Code NAF twice and disagree with themselves. One
+    mention, one field, one rendering — and no free-text block anywhere in this form that
+    restates a structured value. Capital social is money: `numeric(14,2)`, rendered `1 200 €`,
+    stored `1200.00`. Validate shape only; checksum validation is explicitly out of E0.
+- id: "5"
+  title: Client contact — model and form
+  description: >-
+    CAP-5. A `particulier` or `professionnel` contact with the exact field set and
+    required/optional/future verdicts of client-contact-fields.md.
+  invoke_dev_with: >-
+    The verdict table in `client-contact-fields.md` is the contract, and its "future" column
+    is as binding as its "required" column — do not collect a field it defers, even if the
+    competitor's §5.1 has it. The display line is derived, never stored, for the same reason
+    the NAF code diverged. Switching the type toggle must not silently discard data already
+    entered. This table holds the product's first personal data about people who are not
+    users: give it the creation timestamp and stable subject identifier that story 2
+    established for `user_account`. Client type is load-bearing, not a cosmetic label — the
+    set of mentions a future invoice must carry is a function of it.
+- id: "6"
+  title: Client contact — list
+  description: >-
+    CAP-6. A cursor-paginated, deterministically ordered list with empty, loading and error
+    states, that never issues a query per row.
+  invoke_dev_with: >-
+    Budget is in SPEC.md — 500 contacts per organisation, 50 per page, under 300 ms server,
+    at most two queries. The 500 comes from one pilot describing its own business, so build
+    for the shape rather than the number: cursor pagination from the first commit, a
+    composite index leading on `org_id`, and the `EXPLAIN (ANALYZE, BUFFERS)` in the PR that
+    40-performance-scalability.md requires. Validate that the cursor belongs to the caller's
+    organisation. No client-side filtering of a fetched list, at any volume.
+- id: "7"
+  title: "E0 acceptance: the boundary, proven"
+  description: >-
+    The success signal made executable — SoRenov's real legal block and both real contacts
+    seeded across two organisations, and a consolidated cross-tenant suite covering every
+    operation in the authorisation table.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    Write this story in a session that did NOT build stories 1 to 3. An agent that writes the
+    isolation suite for a boundary it built itself derives its assertions from the behaviour
+    it observes, so the suite agrees with the implementation and proves nothing; a bug in the
+    boundary becomes a passing test. Derive every assertion from SPEC.md — the authorisation
+    table and the tenant isolation section — and read the implementation only to locate
+    entry points, never to decide what correct looks like. Where the two disagree, the spec
+    is right until a human says otherwise. Cover: organisation A using organisation B's id
+    gets 404 on every read and write, and no row changes; the same suite passing with RLS as
+    the only defence, to prove the second line stands alone; and a valid reset token for
+    organisation B, presented while holding a session for organisation A, changing nothing in
+    organisation A.

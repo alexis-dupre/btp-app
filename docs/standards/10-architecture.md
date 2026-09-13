@@ -8,7 +8,7 @@ alternative buys and what it costs.
 | Layer | Choice | Why |
 |---|---|---|
 | Framework | Next.js 16.3.4 App Router, RSC, TypeScript strict, no `src/` | scaffolded by the shadcn `next` template |
-| UI | shadcn/ui preset `b4qO`, **Base UI** primitives, Tailwind v4, lucide, Manrope | imposed constraint; tokens in `app/globals.css` are the source of truth |
+| UI | shadcn/ui, **Base UI** primitives, Tailwind v4, lucide, Manrope | imposed constraint; **`app/globals.css` is the source of truth for every token** — not a preset code. See ADR-0001 |
 | Forms | React Hook Form + Zod | one schema, client and server |
 | Database | PostgreSQL 16 | correctness, `numeric`, RLS, real constraints |
 | ORM | Drizzle | typed SQL, explicit migrations, no hidden queries |
