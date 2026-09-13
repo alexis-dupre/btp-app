@@ -1,0 +1,47 @@
+# Team override for bmad-spec. Committed.
+#
+# Written by the bmad-customize skill. To change it, describe the change in plain language
+# and re-run bmad-customize rather than hand-editing — the schema belongs to BMad and it
+# changes between versions. See _bmad/custom/README.md.
+#
+# Base surface: .claude/skills/bmad-spec/customize.toml
+# Merge rules:  scalars override the base • arrays append to the base
+
+[workflow]
+
+# Project spec shape: the BMad five-field kernel plus the four sections this project
+# additionally requires. Non-goals carries the explicit out-of-scope requirement.
+spec_template = "{project-root}/_bmad/custom/bmad-spec-btp-template.md"
+
+persistent_facts = [
+  # The register of record for French BTP rules, loaded so statuses can be quoted verbatim.
+  "file:{project-root}/docs/domain/btp-rules.md",
+
+  "A spec in this project is incomplete unless all five are present and substantive: (a) Tenant isolation impact, (b) Authorisation with one predicate per new or changed operation, (c) Performance budget for any new list or page, (d) BTP rules applicability with a status per rule, (e) a non-empty Non-goals section. Non-goals IS the explicit out-of-scope section — do not add a second heading for it.",
+
+  "An incomplete spec must not be handed to build. Until all five are filled: do not offer Story Breakdown, do not write stories.yaml, and do not describe the spec as ready or done. Name the missing section plainly instead.",
+
+  "Template placeholder text left unreplaced counts as missing, not as present. A section reading only the guidance comment is not filled.",
+
+  "Statuses in the BTP rules register are CONFIRMED, TO VERIFY and OPEN. Copy the status verbatim from docs/domain/btp-rules.md with its R-number; never assert or upgrade a status in the spec. A rule that is not CONFIRMED blocks every capability that depends on it — record that in the Blocking column and mirror it as an open_questions entry.",
+
+  "A business rule absent from the register must not be implemented from memory or improvised. Route it to the btp-domain-expert subagent to be sourced and added to docs/domain/btp-rules.md, or raise it as an open question. This applies to VAT rates, retenue de garantie, invoicing formats and sous-traitance in particular.",
+
+  "An authorisation predicate is a boolean expression over the session and the target resource, precise enough to implement and to test directly. Role names alone are not predicates. The organisation always comes from the session, never from a request parameter, header or path segment the client controls.",
+
+  "Standards that govern these sections, read on demand when a section needs detail: docs/standards/30-security.md (tenancy, authz), docs/standards/40-performance-scalability.md (budgets), docs/standards/00-definition-of-done.md.",
+]
+
+activation_steps_append = [
+  "Read {project-root}/docs/domain/btp-rules.md and note every rule R-number with its current status verbatim. The BTP rules applicability section cites these; it never restates a rule from memory.",
+]
+
+on_complete = [
+  "Run a completeness gate over the rendered SPEC.md before reporting anything to the caller. Check each of the five project-mandated elements in order: Tenant isolation impact; Authorisation (one predicate row per new or changed operation); Performance budget (or an explicit 'No new list or page.'); BTP rules applicability (or an explicit justified 'No BTP rule applies.'); Non-empty Non-goals. A section left as template placeholder or comment text fails the check.",
+
+  "If every check passes, state the spec is complete against the project standard in one line, and list any rule in the BTP table whose status is not CONFIRMED as a build blocker the user must resolve.",
+
+  "If any check fails, state clearly that the spec is INCOMPLETE, name each missing or placeholder section, and state that it must not be handed to build — no Story Breakdown and no stories.yaml — until they are filled. Then offer to fill them.",
+
+  "Record the gate verdict to the memlog: uv run {project-root}/_bmad/scripts/memlog.py append --workspace {spec-folder} --type event --text with the verdict and any missing sections.",
+]
