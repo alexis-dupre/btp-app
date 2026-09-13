@@ -54,6 +54,11 @@ A loop may only start when:
 `tsconfig.json`, the lint/test configs and `docs/standards/**`. It also blocks introducing
 `.skip`, `.only` or `.todo` in test files.
 
+The same rules apply to shell commands. `path_policy.py` is shared by the Edit guard and the
+Bash guard, so `cat >`, `sed -i`, `tee`, `cp`, `mv`, `rm` and inline interpreter one-liners
+cannot write what the Edit tool is forbidden from writing. A path rule that covers only one
+tool is not a rule — it is a speed bump with a marked detour.
+
 This is the single most important rule for unattended work. An agent that can relax the
 standard it is measured against will always eventually pass. A human lifts the block
 deliberately with `BTP_ALLOW_GATE_EDIT=1`.

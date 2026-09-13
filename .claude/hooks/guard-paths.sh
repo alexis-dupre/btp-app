@@ -1,30 +1,12 @@
 #!/usr/bin/env bash
-# PreToolUse (Edit|Write|NotebookEdit): refuse edits to files the agent must not own.
+# PreToolUse (Edit|Write|NotebookEdit): refuse writes to protected paths.
+# The rules themselves live in path_policy.py, shared with guard-bash.sh, so a Bash
+# redirection cannot do what the Edit tool is forbidden from doing.
 source "$(dirname "$0")/lib.sh"
 
 FILE="$(hook_field '.tool_input.file_path')"
 [ -z "$FILE" ] && exit 0
 
-case "$FILE" in
-  */components/ui/*|components/ui/*)
-    block "Refused: components/ui/** is owned by the shadcn registry.
-Regenerate it with 'pnpm dlx shadcn@latest add <component> --overwrite', or create a
-wrapper in components/<feature>/ that composes the primitive. See docs/standards/20-design-system.md." ;;
-  *.env|*.env.*|*/.env|*/.env.*)
-    block "Refused: environment files are never edited by an agent. Ask the user to set the variable, and document it in .env.example." ;;
-  *pnpm-lock.yaml|*package-lock.json|*yarn.lock)
-    block "Refused: lockfiles are generated. Run the package manager instead." ;;
-  */node_modules/*|*/.next/*|*/dist/*|*/build/*)
-    block "Refused: generated or vendored directory." ;;
-esac
-
-# Applied migrations are immutable: fix forward with a new migration.
-case "$FILE" in
-  */drizzle/*.sql|drizzle/*.sql|*/migrations/*.sql|migrations/*.sql)
-    if [ -f "$FILE" ]; then
-      block "Refused: '$FILE' already exists. Applied migrations are immutable.
-Create a new migration that fixes forward. See docs/standards/70-data-and-migrations.md."
-    fi ;;
-esac
-
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+OUT="$(BTP_REPO_ROOT="$ROOT" python3 "$(dirname "$0")/path_policy.py" policy "$FILE" 2>&1)" || block "Refused: $OUT"
 exit 0

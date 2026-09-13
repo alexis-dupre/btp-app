@@ -51,3 +51,12 @@ Docker Compose Postgres for integration. No mocking of the ORM — mocked SQL pr
 ```
 
 `verify:fast` is what the `Stop` hook runs. `verify` is what CI runs. They must never diverge.
+
+## Toolchain pins
+
+- **ESLint is pinned to `^9`** — ESLint 10 crashes `eslint-plugin-react`, which arrives
+  transitively via `eslint-config-next`. See ADR-0003. Do not bump it as routine maintenance;
+  refuse any agent or bot that proposes it until the upstream fix ships.
+- Scripts are added to `package.json` only when the tool they call is actually installed.
+  `scripts/verify.sh` reports a missing stage as `SKIPPED` and lists it in the summary — a
+  stage that is not configured is never counted as a pass.

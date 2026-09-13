@@ -14,15 +14,9 @@ FILE="$(hook_field '.tool_input.file_path')"
 
 REL="${FILE#"$PWD"/}"
 
-case "$REL" in
-  .claude/settings.json|.claude/hooks/*|.claude/agents/*|.github/workflows/*|\
-  scripts/verify.sh|scripts/check-bundle-budget.mjs|scripts/loop/*|\
-  tsconfig.json|eslint.config.*|.eslintrc*|vitest.config.*|vitest.integration.*|\
-  playwright.config.*|docs/standards/*)
-    block "Refused: '$REL' is part of the quality gate. An agent does not change the rules it
-is measured by. If this change is genuinely needed, stop and ask the user to make it — or
-re-run with BTP_ALLOW_GATE_EDIT=1 after they approve it explicitly." ;;
-esac
+# Path-based gate protection lives in path_policy.py, shared with guard-bash.sh, so a shell
+# redirection cannot do what the Edit tool is forbidden from doing. This hook keeps only the
+# checks that depend on the *content* being written.
 
 # Deleting or skipping tests is the other way to a false green.
 case "$REL" in

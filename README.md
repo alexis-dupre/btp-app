@@ -22,7 +22,8 @@ Everything below is one or the other. Nothing relies on an agent's good intentio
 ## The five layers
 
 ```
-┌─ L5  Autonomy ............... scripts/loop — one worker per story, gate between each
+┌─ L6  Parallelism ............ scripts/stream — one worktree per stream, claims enforced by hook
+├─ L5  Autonomy ............... scripts/loop — one worker per story, gate between each
 ├─ L4  CI mirror .............. .github/workflows — the same gate, without an agent
 ├─ L3  Deterministic gates .... .claude/hooks — block, format, typecheck, refuse to stop on red
 ├─ L2  Expert subagents ....... .claude/agents — 13 specialists, tool-restricted
@@ -37,6 +38,7 @@ Everything below is one or the other. Nothing relies on an agent's good intentio
 | `CLAUDE.md` | The constitution. Loaded into every session and every subagent. |
 | `.claude/agents/` | 13 experts: design system, UX, a11y, front end, API, data, performance, security × 2, testing, review, DevOps, BTP domain — plus a `tech-lead` that routes and arbitrates. |
 | `.claude/skills/` | `/ship-story`, `/quality-gate`, `/design-review`, `/threat-model`, `/preflight`, `/run-epic`, `/loop-triage`. |
+| `scripts/stream/` | Parallel sessions: one git worktree per stream, declared claims, and a hook that refuses edits into another live stream's area. |
 | `scripts/loop/` | The autonomous runner: one `bmad-build-auto` worker per story, our full gate after each, circuit breakers, escalation file. |
 | `.claude/hooks/` | Blocks `npm`, blocks edits to `components/ui/**` and `.env`, blocks `drizzle-kit push` and `--no-verify`, typechecks after every write, refuses to end a turn on a red tree. |
 | `.claude/settings.json` | Permissions and hook wiring. |
@@ -99,6 +101,20 @@ The rule that makes this safe: `guard-integrity.sh` stops any agent from editing
 is measured by — settings, hooks, CI, tsconfig, lint and test configs, the standards — or from
 introducing a skipped test. An agent that can relax the standard will eventually pass by
 relaxing it. See `docs/standards/90-autonomous-loops.md`.
+
+## Running several sessions at once
+
+```bash
+bash scripts/stream/stream.sh new devis feat/devis lib/domain/devis "app/(app)/devis"
+```
+
+One worktree, one branch, one Claude Code session, a declared set of owned directories.
+`guard-stream.sh` refuses any edit into another live stream's area, and serialises the three
+things that are global by nature — dependencies, migrations, the shadcn registry.
+
+Parallel sessions do not collide on git; they collide on meaning. Two streams each adding a
+migration merge cleanly and produce something nobody designed. See
+`docs/standards/95-parallel-streams.md`.
 
 ## What this will and will not do
 

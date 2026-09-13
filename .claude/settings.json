@@ -63,6 +63,10 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/guard-integrity.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-stream.sh"
           }
         ]
       },

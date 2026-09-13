@@ -30,6 +30,18 @@ Then verify:
 - Each hook script blocks on a hostile input:
   `echo '{"tool_input":{"command":"npm install x"}}' | bash .claude/hooks/guard-bash.sh; echo $?`
   (expect 2)
+- **The Bash bypass is closed.** A path rule that only covers the Edit tool is not a rule.
+  Each of these must exit 2 — run them, do not assume:
+  - `cat > .claude/settings.json <<EOF`
+  - `sed -i '' 's/a/b/' tsconfig.json`
+  - `cp /tmp/x components/ui/button.tsx`
+  - `tee -a .github/workflows/quality-gate.yml`
+  - `python3 -c "open('.claude/settings.json','w')"`
+  - `git worktree add -b x ../y`  (streams must be registered, see 95-parallel-streams.md)
+  And each of these must exit 0 — a false positive is worse than a missing rule:
+  - `cat > lib/domain/tva.ts <<EOF`
+  - `pnpm test 2> /dev/null`
+  - `pnpm dlx shadcn@latest add badge`
 - `pnpm verify:fast` runs and the scripts it references exist in `package.json`.
 
 Report a table of `check | result | fix`. Never report a green check you did not run.
