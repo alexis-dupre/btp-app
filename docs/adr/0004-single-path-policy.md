@@ -130,10 +130,48 @@ the command. Four legitimate shapes are now refused that were allowed yesterday:
   positive reappearing in the one section that cannot use the fix, for the reason in
   property 1 above.
 
-The last one was hit twice while building the self-tests for this very change; the workaround
-is to assemble the literal at runtime, which is exactly the "pre-emptive workaround" the
-policy is supposed to discourage. **Accepted anyway**, because the escape it closes writes to
-protected paths undetected, whereas the cost is paid by a handful of read-only and
-documentation shapes that have an obvious alternative: run the program from a file. If this
-starts firing on ordinary work, narrow it by requiring the protected path to appear _outside_
-any heredoc body fed to a non-interpreter — do not widen `BTP_ALLOW_GATE_EDIT`.
+**Accepted anyway**, because the escape it closes writes to protected paths undetected,
+whereas the cost is paid by a handful of read-only and documentation shapes that have an
+obvious alternative: run the program from a file.
+
+### The count
+
+The original decision said false positives are the real risk, and set a signal without a
+number. Here is the number. **Four false positives were observed on 2026-09-13**, across all
+three sections of the guard. Every one of them fired on text that **names** a command rather
+than running one:
+
+| #   | Section | What was refused                                                                                                                                       |
+| --- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | 3       | `stories.yaml` written through a heredoc whose body said `drizzle-kit push`, in a note telling a future agent not to run it. Amendment (a)'s origin.   |
+| 2   | 1       | A self-test file whose heredoc body contained `cp /tmp/x components/ui/button.tsx` as test data. `targets()` reads the body, by design.                |
+| 3   | 3       | Self-test files whose heredoc bodies named banned commands. **Pre-empted, not hit** — the literals were assembled at runtime to get the write through. |
+| 4   | 2       | A document written with `cat` quoting an interpreter-heredoc example while naming a protected path. Refused by the change recorded above.              |
+
+Row 3 is the one that matters, and it is the reason this section exists rather than a
+sentence of prose. **A workaround is worse than an escape hatch, because it is invisible.**
+`BTP_ALLOW_GATE_EDIT=1` is loud: it appears in the command, someone can grep for it, and its
+routine use is the documented signal that the policy is too broad. Splitting `"np" + "m
+install"` across a concatenation to slip a string past a regex leaves no trace at all. It
+does not register as a workaround to the person doing it — it feels like a formatting
+detail — and so the signal the original decision relies on never fires. Counting these is
+the only way the signal stays real.
+
+### The threshold
+
+Not a vague "if it starts firing on ordinary work". **If more false positives of this same
+shape — text naming a command rather than running one — are observed on or before
+2026-09-27, section 2 narrows.** No further evidence-gathering, no re-litigating whether the
+escape is serious; the count is the trigger.
+
+**The candidate narrowing:** require the protected path and the interpreter invocation to sit
+in the **same shell word sequence** — the same simple command, between the same pair of
+`;`/`&&`/`||`/`|` separators — rather than merely somewhere in the same command string. That
+is what kills row 4: in `cat > notes.md <<'EOF' … python3 - <<'PY' … EOF`, the interpreter
+text and the protected path are inside a body belonging to `cat`, not operands of any
+interpreter invocation. It costs some genuine coverage — an attacker can put the path in one
+word sequence and the interpreter in another — which is precisely why it is held back until
+the count justifies paying for it.
+
+Narrow the pattern. **Do not widen `BTP_ALLOW_GATE_EDIT`, and do not normalise the
+workaround.**

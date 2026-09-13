@@ -14,7 +14,9 @@ STREAM="$(cat .btp-stream 2>/dev/null)"
 if [ -n "$STREAM" ]; then
   echo
   echo "### Parallel session"
-  echo "You are stream '$STREAM'. You own only the areas it claims; edits elsewhere are refused."
+  echo "You are stream '$STREAM'. An edit is refused only inside another live stream's claim,"
+  echo "or on an exclusive resource (deps, migrations, registry) held by another stream or by"
+  echo "nobody. A path outside your own claim that no other stream owns is yours to edit."
   python3 scripts/stream/streams.py list 2>/dev/null | grep '^\[LIVE' || true
   python3 scripts/stream/streams.py heartbeat "$STREAM" 2>/dev/null
 elif python3 scripts/stream/streams.py list 2>/dev/null | grep -q '^\[LIVE'; then
