@@ -22,6 +22,7 @@ pnpm test:integration   # needs the local Postgres, see docs/standards/50-testin
 pnpm test:e2e
 pnpm test:a11y
 pnpm audit --audit-level=high
+git ls-files -co --exclude-standard 'docs/specs/*/SPEC.md' | xargs -r node scripts/check-spec.mjs
 ```
 
 ## Then check what a script cannot
@@ -40,6 +41,7 @@ pnpm audit --audit-level=high
 GATE: PASS | FAIL
 typecheck   ✓/✗   lint ✓/✗   unit ✓/✗   build ✓/✗
 integration ✓/✗   e2e  ✓/✗   a11y ✓/✗   audit ✓/✗
+spec-check  ✓/✗
 Manual checks: <findings or "none">
 Blocking: <list, or "none">
 ```

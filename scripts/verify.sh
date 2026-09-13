@@ -36,6 +36,16 @@ run "typecheck"      typecheck      || exit 1
 run "lint"           lint           || exit 1
 run "unit tests"     test:unit      || exit 1
 
+echo
+echo "── spec contract"
+SPECS=$(git ls-files -co --exclude-standard 'docs/specs/*/SPEC.md')
+if [ -z "$SPECS" ]; then
+  echo "   SKIPPED — no spec folders found, nothing checked."
+  SKIPPED+=("spec contract (no specs yet)")
+else
+  printf '%s\n' "$SPECS" | xargs node scripts/check-spec.mjs || exit 1
+fi
+
 if [ "$FAST" = "--fast" ]; then
   echo
   [ ${#SKIPPED[@]} -gt 0 ] && printf 'Not checked: %s\n' "$(IFS=', '; echo "${SKIPPED[*]}")"

@@ -13,6 +13,11 @@
 # additionally requires. Non-goals carries the explicit out-of-scope requirement.
 spec_template = "{project-root}/_bmad/custom/bmad-spec-btp-template.md"
 
+# The base appends "/specs" to {output_folder}, which is already {project-root}/docs/specs,
+# landing specs in docs/specs/specs/. Drop the extra segment so a spec folder is exactly
+# one level below docs/specs/ — scripts/check-spec.mjs is globbed at that fixed depth.
+spec_output_path = "{output_folder}"
+
 persistent_facts = [
   # The register of record for French BTP rules, loaded so statuses can be quoted verbatim.
   "file:{project-root}/docs/domain/btp-rules.md",
@@ -38,6 +43,8 @@ activation_steps_append = [
 
 on_complete = [
   "Run a completeness gate over the rendered SPEC.md before reporting anything to the caller. Check each of the five project-mandated elements in order: Tenant isolation impact; Authorisation (one predicate row per new or changed operation); Performance budget (or an explicit 'No new list or page.'); BTP rules applicability (or an explicit justified 'No BTP rule applies.'); Non-empty Non-goals. A section left as template placeholder or comment text fails the check.",
+
+  'Detect unfilled sections mechanically, not by eye — a section can be present and still be empty of content. Any curly-brace placeholder left over from the template counts as missing: grep -nE "\{[A-Za-z<][^}]*\}" over the rendered SPEC.md must return nothing. Run this check as well as the presence check; presence alone passes a section that was copied but never written.',
 
   "If every check passes, state the spec is complete against the project standard in one line, and list any rule in the BTP table whose status is not CONFIRMED as a build blocker the user must resolve.",
 
