@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run lib/domain lib/utils",
     "verify:fast": "bash scripts/verify.sh --fast",
-    "verify": "bash scripts/verify.sh"
+    "verify": "bash scripts/verify.sh",
+    "test": "pnpm verify:fast"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
