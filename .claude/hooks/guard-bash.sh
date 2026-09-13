@@ -49,27 +49,35 @@ Use the normal tools so the guards can see what you are doing."
   fi
 fi
 
+# --- 2b. heredoc bodies are data, not command -------------------------------
+# The contract rules below match on command text. A heredoc body is content being written
+# to a file, not a command being run, so a document that merely *names* a banned command
+# must not be refused — the first observed false positive of this guard, see ADR-0004.
+# Section 1 above deliberately keeps the full string: the redirection target sits outside
+# the body, and that is the write we must still see.
+CMD_RULES="$(python3 "$HOOKDIR/path_policy.py" strip-heredocs "$CMD")"
+
 # --- 3. contract rules ------------------------------------------------------
-if printf '%s' "$CMD" | grep -Eq '(^|[;&|[:space:]])(npm|yarn)[[:space:]]+(i|install|add|ci)([[:space:]]|$)'; then
+if printf '%s' "$CMD_RULES" | grep -Eq '(^|[;&|[:space:]])(npm|yarn)[[:space:]]+(i|install|add|ci)([[:space:]]|$)'; then
   block "Refused: this project uses pnpm. Use 'pnpm add' / 'pnpm install'."
 fi
-if printf '%s' "$CMD" | grep -Eq 'git[[:space:]]+commit.*(--no-verify|-n[[:space:]]|-n$)'; then
+if printf '%s' "$CMD_RULES" | grep -Eq 'git[[:space:]]+commit.*(--no-verify|-n[[:space:]]|-n$)'; then
   block "Refused: --no-verify bypasses the quality gate. Fix the failure instead."
 fi
-if printf '%s' "$CMD" | grep -Eq 'git[[:space:]]+push.*(--force([^-]|$)|-f([[:space:]]|$))'; then
+if printf '%s' "$CMD_RULES" | grep -Eq 'git[[:space:]]+push.*(--force([^-]|$)|-f([[:space:]]|$))'; then
   block "Refused: force push. Use --force-with-lease and ask the user first."
 fi
-if printf '%s' "$CMD" | grep -Eq 'drizzle-kit[[:space:]]+push'; then
+if printf '%s' "$CMD_RULES" | grep -Eq 'drizzle-kit[[:space:]]+push'; then
   block "Refused: 'drizzle-kit push' mutates a database without a migration file.
 Use 'pnpm db:generate' then 'pnpm db:migrate'. See docs/standards/70-data-and-migrations.md."
 fi
-if printf '%s' "$CMD" | grep -Eiq '(DROP|TRUNCATE)[[:space:]]+(TABLE|SCHEMA|DATABASE)'; then
+if printf '%s' "$CMD_RULES" | grep -Eiq '(DROP|TRUNCATE)[[:space:]]+(TABLE|SCHEMA|DATABASE)'; then
   block "Refused: destructive SQL. Express it as a reversible migration and have the user run it."
 fi
-if printf '%s' "$CMD" | grep -Eq 'vitest.*--(bail|passWithNoTests)|jest.*--passWithNoTests'; then
+if printf '%s' "$CMD_RULES" | grep -Eq 'vitest.*--(bail|passWithNoTests)|jest.*--passWithNoTests'; then
   block "Refused: do not weaken the test run to make it pass."
 fi
-if printf '%s' "$CMD" | grep -Eq 'git[[:space:]]+worktree[[:space:]]+add'; then
+if printf '%s' "$CMD_RULES" | grep -Eq 'git[[:space:]]+worktree[[:space:]]+add'; then
   block "Refused: create a parallel session with 'bash scripts/stream/stream.sh new <name> <branch> <dirs>'
 so the area it owns is registered. A raw worktree has no claim and collides silently.
 See docs/standards/95-parallel-streams.md."

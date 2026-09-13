@@ -7,6 +7,7 @@ straight past every path guard. One policy, two entry points.
 
   policy <repo-relative-path>   exit 2 + reason when the path is protected
   targets <shell-command>       print every path that command would write to
+  strip-heredocs <shell-command>  print the command with heredoc bodies removed
 """
 import re, sys, os
 
@@ -67,6 +68,44 @@ def policy(path):
     return None
 
 
+HEREDOC_START = re.compile(
+    r"""<<(?!<)(-?)[ \t]*(?:"([^"\n]+)"|'([^'\n]+)'|\\?([A-Za-z_][A-Za-z0-9_]*))"""
+)
+
+
+def strip_heredocs(cmd):
+    """Remove heredoc bodies, keeping the command lines around them.
+
+    A heredoc body is data being written to a file, not a command being run. The contract
+    rules in guard-bash.sh match on command text, so a document that merely *names* a
+    banned command must not be refused. Path extraction deliberately does NOT use this:
+    the redirection target sits outside the body and must stay visible.
+    """
+    lines = cmd.split("\n")
+    out, i, n, unterminated = [], 0, len(lines), False
+    while i < n:
+        line = lines[i]
+        out.append(line)
+        delims = [(m.group(2) or m.group(3) or m.group(4), m.group(1) == "-")
+                  for m in HEREDOC_START.finditer(line)]
+        i += 1
+        for delim, dash in delims:
+            found = False
+            while i < n:
+                cand = lines[i]
+                i += 1
+                probe = cand.lstrip("\t") if dash else cand
+                if probe.rstrip() == delim:
+                    found = True
+                    break
+            if not found:
+                unterminated = True
+    # Fail closed. An unterminated heredoc would swallow the rest of the command and hide a
+    # banned one inside what looks like a body. When the end of the body is not visible,
+    # return the whole string and let every rule see it.
+    return cmd if unterminated else "\n".join(out)
+
+
 FLAG = re.compile(r"^-")
 
 
@@ -115,5 +154,8 @@ if __name__ == "__main__":
         sys.exit(0)
     if mode == "targets":
         print("\n".join(targets(arg)))
+        sys.exit(0)
+    if mode == "strip-heredocs":
+        sys.stdout.write(strip_heredocs(arg))
         sys.exit(0)
     sys.exit(f"unknown mode {mode}")
