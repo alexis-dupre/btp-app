@@ -44,3 +44,45 @@ inline interpreter and a protected path anywhere in the command is refused outri
 **Signal this was wrong:** if the false-positive rate makes people reach for
 `BTP_ALLOW_GATE_EDIT=1` routinely, the policy is too broad. Narrow the patterns; never widen
 the escape hatch.
+
+## Amendment 2026-09-13 — the first false positive, and what it cost
+
+The signal above fired, once, in the shape the ADR predicted.
+
+**What happened.** A session writing `docs/specs/spec-e0-walking-skeleton/stories.yaml` through
+a shell heredoc was refused by section 3: the file's content contained the string
+`drizzle-kit push`, inside a note _instructing a future agent not to run it_. The guard matched
+on the whole command string, heredoc body included, so a document that names a banned command
+was treated as a command. The writing agent was not trying to run anything; the correct path
+was refused for describing itself.
+
+**Remedy: narrow the pattern.** `path_policy.py` gains a `strip-heredocs` mode, and
+`guard-bash.sh` runs the section 3 contract rules against the stripped string. A heredoc body is
+data being written to a file, not a command being run. Two properties are kept deliberately:
+
+1. **Section 1 still sees the full command.** The redirection target — the thing that decides
+   whether a protected path is being written — sits outside the body. Stripping it there would
+   have re-opened the hole this ADR exists to close.
+2. **An unterminated heredoc fails closed.** If the terminator is not found, the body would
+   swallow the rest of the command and hide a real banned invocation after it, so the rules
+   scan the whole string instead.
+
+**Verified both directions**, as the original decision requires: eleven existing `/preflight`
+assertions pass unchanged before and after; ten new cases go from 8/10 to 10/10. The new cases
+include the two that matter in opposite directions — a banned command _named inside_ a heredoc
+body is now allowed, and a banned command placed _after_ a heredoc terminator is still refused.
+
+**A second, more serious finding, not yet fixed.** While diagnosing this, a write to
+`docs/standards/10-architecture.md` — a protected path — succeeded through
+`python3 - <<'PY'` … `PY`, opening the file from inside the script. Neither guard saw it:
+`targets()` extracts shell redirections and finds none, and section 2 only refuses an inline
+interpreter invoked with `-c` or `-e`. Reading the program from **stdin** is the same escape
+with different syntax, and it is not covered. The edit itself was authorised by the user, but
+the mechanism was not — this is precisely the marked detour the ADR was written to close, taken
+by accident rather than by intent, which is exactly how it predicted such things would be taken.
+
+The narrow fix is to extend section 2's interpreter pattern to a bare `-` operand and to a
+heredoc feeding an interpreter's stdin. It is left open here rather than bundled into the
+false-positive fix, because widening a refusal and narrowing one should not ride in on the same
+change: one of them makes the guard stricter, and it deserves its own self-test in both
+directions.
