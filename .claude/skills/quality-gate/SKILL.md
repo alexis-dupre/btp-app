@@ -23,6 +23,7 @@ pnpm test:e2e
 pnpm test:a11y
 pnpm audit --audit-level=high
 git ls-files -co --exclude-standard 'docs/specs/*/SPEC.md' | xargs -r node scripts/check-spec.mjs
+node scripts/check-rules.mjs
 ```
 
 ## Then check what a script cannot
@@ -41,7 +42,7 @@ git ls-files -co --exclude-standard 'docs/specs/*/SPEC.md' | xargs -r node scrip
 GATE: PASS | FAIL
 typecheck   ✓/✗   lint ✓/✗   unit ✓/✗   build ✓/✗
 integration ✓/✗   e2e  ✓/✗   a11y ✓/✗   audit ✓/✗
-spec-check  ✓/✗
+spec-check  ✓/✗   rules ✓/✗
 Manual checks: <findings or "none">
 Blocking: <list, or "none">
 ```

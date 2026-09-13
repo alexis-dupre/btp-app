@@ -46,6 +46,8 @@ else
   printf '%s\n' "$SPECS" | xargs node scripts/check-spec.mjs || exit 1
 fi
 
+echo; echo "── rules register"; node scripts/check-rules.mjs || exit 1
+
 if [ "$FAST" = "--fast" ]; then
   echo
   [ ${#SKIPPED[@]} -gt 0 ] && printf 'Not checked: %s\n' "$(IFS=', '; echo "${SKIPPED[*]}")"
