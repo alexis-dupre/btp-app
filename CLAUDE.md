@@ -55,9 +55,11 @@ them. The preconditions and the list of work that never runs unattended are in
   ask the `btp-domain-expert` subagent or ask the user. Do not improvise VAT rates,
   retention rules, or invoicing formats.
 - Every non-trivial decision that constrains future work becomes an ADR in `docs/adr/`.
-- Other sessions may be running in parallel worktrees. If this worktree has a `.btp-stream`
-  file, you own only the directories that stream claims, and a hook refuses edits elsewhere.
-  That refusal is correct — never work around it. See `docs/standards/95-parallel-streams.md`.
+- Other sessions may be running in parallel worktrees. A hook refuses an edit only when the
+  path falls inside another live stream's claim, or maps to an exclusive resource (`deps`,
+  `migrations`, `registry`) held by another stream or held by nobody. A path outside your own
+  claim that no other stream owns is yours to edit. A refusal is correct — never work around
+  it, and never widen a claim to get past one. See `docs/standards/95-parallel-streams.md`.
 
 ## Delegation map
 
