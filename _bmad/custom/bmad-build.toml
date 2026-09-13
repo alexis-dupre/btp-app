@@ -1,0 +1,145 @@
+# Team override for bmad-build. Committed.
+#
+# Written by the bmad-customize skill. To change it, describe the change in plain language
+# and re-run bmad-customize rather than hand-editing — the schema belongs to BMad and it
+# changes between versions. See _bmad/custom/README.md.
+#
+# Base surface: .claude/skills/bmad-build/customize.toml
+# Merge rules:  scalars override the base • arrays append • review layers merge by `id`
+
+[workflow]
+
+persistent_facts = [
+  # Routing map for the design pass. Lives here as well as in the handoff so it also
+  # governs the oneshot route, which never reads implementation_handoff.
+  "Before any code is written, this project runs a design pass with the expert subagents whose trigger the change matches: btp-domain-expert for any French BTP domain concept (devis, situation, retenue de garantie, TVA, sous-traitance, Factur-X); security-architect for anything touching auth, permissions, personal data, uploads or money; data-modeler for anything persisted (schema, migration, index, tenancy column); api-architect for the server contract (server action, route handler, validation schema, error taxonomy); design-system-guardian for any UI. A subagent is skipped only when the change matches none of its triggers, and the skip is stated with its reason.",
+
+  "When design-pass experts disagree: security-architect wins on security, btp-domain-expert wins on a French regulatory rule, and the user decides everything else. Never resolve such a conflict silently.",
+
+  "components/ui/** is owned by the shadcn registry and is never hand-edited — not during implementation, not to apply a review fix. Regenerate with the shadcn CLI (pnpm dlx shadcn@latest add <cmp>) or wrap the registry component in components/.",
+
+  "A finding this project's reviewers (code-reviewer, security-reviewer, accessibility-auditor) label BLOCKING is resolved in code before the work is reported done. Triage still renders its own verdict on the defect, but a BLOCKING finding may not be routed to defer and may not be carried into the presented result as an open item. Every BTP tenancy-isolation finding is BLOCKING by definition.",
+]
+
+on_complete = [
+  "Before reporting done, list every finding the project review layers (project-code-review, project-security-review, project-accessibility-audit) labelled BLOCKING, and state for each where it was fixed. If any is unfixed — deferred, carried as an open item, or dropped — say plainly that the work is NOT done, name it, and fix it before reporting again.",
+
+  "Confirm mechanically that the registry was not hand-edited: the diff must contain no change under components/ui/. If it does, revert those files and regenerate the component with the shadcn CLI, or wrap it in components/ instead.",
+]
+
+# The whole execution recipe for step 03: the project design pass, then the dispatch.
+# The base's "no house-style rules in the dispatch" still holds — what is injected below
+# is the experts' change-specific constraints, not standing project boilerplate.
+implementation_handoff = """
+Run the project design pass first, then implement.
+
+**1 — Design pass.** Read {spec_file}. Launch together, in one turn, every project subagent whose trigger the spec matches:
+
+- `btp-domain-expert` — any French BTP domain concept (devis, situation, retenue de garantie, TVA, sous-traitance, Factur-X)
+- `security-architect` — anything touching auth, permissions, personal data, uploads or money
+- `data-modeler` — anything persisted (schema, migration, index, tenancy column)
+- `api-architect` — the server contract (server action, route handler, validation schema, error taxonomy)
+- `design-system-guardian` — any UI
+
+Give each the spec path and ask for a short list of binding constraints on this change, nothing else — no implementation. Announce which subagents you skipped and why. Resolve conflicts by the project rule (security-architect on security, btp-domain-expert on a regulatory rule, otherwise ask the user); never resolve one silently.
+
+**2 — Implementation.** Launch a subagent with no prior conversation context, with this prompt:
+
+> Read {spec_file} fully and implement it — the spec is the sole source of truth. Load every file listed in its frontmatter `context:` before you start.
+>
+> The project design experts set these constraints for this change. They are binding; where one meets your own judgement, follow it:
+>
+> <paste each constraint verbatim here, attributed to the subagent that set it; write "None — no expert trigger matched." if the design pass ran no subagents>
+>
+> Never hand-edit `components/ui/**` — that directory is owned by the shadcn registry. Regenerate with `pnpm dlx shadcn@latest add <cmp>` or wrap the registry component in `components/`.
+>
+> When done, report what you changed, how you verified it, and anything left incomplete or risky.
+"""
+
+[[workflow.review_layers]]
+id = "project-code-review"
+name = "Project Code Reviewer"
+instruction = """
+Launch the `code-reviewer` subagent with this prompt:
+
+Review the unified diff at `{diff_file}` for correctness, clarity and maintainability against this project's standards in docs/standards/. Read that file — it is the content under review.
+
+Label each finding BLOCKING or NON-BLOCKING on its own line. BLOCKING means the change is wrong, not that it could be nicer.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+"""
+
+[[workflow.review_layers]]
+id = "project-security-review"
+name = "Project Security Reviewer"
+instruction = """
+Launch the `security-reviewer` subagent with this prompt:
+
+Adversarially review the unified diff at `{diff_file}` for vulnerabilities. Read that file — it is the content under review. Give first priority to multi-tenant isolation: every data access must be scoped by an organisation taken from the session, never from a request parameter, header or path segment the client controls, and each scope must be proven by a negative test.
+
+Label each finding BLOCKING or NON-BLOCKING on its own line. Any tenancy-isolation gap is BLOCKING.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+"""
+
+[[workflow.review_layers]]
+id = "project-accessibility-audit"
+name = "Project Accessibility Auditor"
+when = "The diff at {diff_file} changes UI — any file under app/ or components/, or any style or token file."
+instruction = """
+Launch the `accessibility-auditor` subagent with this prompt:
+
+Audit the UI changed in the unified diff at `{diff_file}` against WCAG 2.2 AA, keyboard operation and screen-reader behaviour. Read that file — it is the content under review. Weigh the on-site context: phone, gloves, direct sunlight, one-handed use.
+
+Label each finding BLOCKING or NON-BLOCKING on its own line. A WCAG 2.2 AA failure is BLOCKING.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+"""
+
+# The oneshot route reviews the worktree directly; same three reviewers, no {diff_file}.
+
+[[workflow.oneshot_review_layers]]
+id = "project-code-review"
+name = "Project Code Reviewer"
+instruction = """
+Launch the `code-reviewer` subagent with this prompt:
+
+Review the changed files in the current worktree for correctness, clarity and maintainability against this project's standards in docs/standards/. Inspect them directly before reviewing.
+
+Label each finding BLOCKING or NON-BLOCKING on its own line. BLOCKING means the change is wrong, not that it could be nicer.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+"""
+
+[[workflow.oneshot_review_layers]]
+id = "project-security-review"
+name = "Project Security Reviewer"
+instruction = """
+Launch the `security-reviewer` subagent with this prompt:
+
+Adversarially review the changed files in the current worktree for vulnerabilities. Inspect them directly before reviewing. Give first priority to multi-tenant isolation: every data access must be scoped by an organisation taken from the session, never from a request parameter, header or path segment the client controls, and each scope must be proven by a negative test.
+
+Label each finding BLOCKING or NON-BLOCKING on its own line. Any tenancy-isolation gap is BLOCKING.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+"""
+
+[[workflow.oneshot_review_layers]]
+id = "project-accessibility-audit"
+name = "Project Accessibility Auditor"
+when = "The worktree changes touch UI — any file under app/ or components/, or any style or token file."
+instruction = """
+Launch the `accessibility-auditor` subagent with this prompt:
+
+Audit the UI changed in the current worktree against WCAG 2.2 AA, keyboard operation and screen-reader behaviour. Inspect the changed files directly before reviewing. Weigh the on-site context: phone, gloves, direct sunlight, one-handed use.
+
+Label each finding BLOCKING or NON-BLOCKING on its own line. A WCAG 2.2 AA failure is BLOCKING.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+"""

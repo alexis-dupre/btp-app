@@ -1,0 +1,63 @@
+# Team override for bmad-review. Committed.
+#
+# Written by the bmad-customize skill. To change it, describe the change in plain language
+# and re-run bmad-customize rather than hand-editing — the schema belongs to BMad and it
+# changes between versions. See _bmad/custom/README.md.
+#
+# Base surface: .claude/skills/bmad-review/customize.toml
+# Merge rules:  scalars override the base • arrays append • lenses merge by `code`
+#
+# Three project lenses appended to the shipped five. New codes, so nothing is replaced.
+
+[[workflow.lenses]]
+code = "design-system"
+name = "Design System"
+applies_to = "code"
+when = "UI code — components, pages, layouts, styles, or design tokens."
+instruction = """
+Review the content for compliance with this project's shadcn design system.
+
+Read `{project-root}/components.json` for the installed preset and `{project-root}/app/globals.css` for the tokens that actually exist. Check any component API against the real registry — `pnpm dlx shadcn@latest docs <component>` or `pnpm dlx shadcn@latest add <component> --view` — never from memory.
+
+Report as a finding:
+- a colour, spacing, radius, font size, or shadow written as a literal or arbitrary value (`bg-[#…]`, `p-[13px]`, an inline style) where a preset token exists
+- a hand-rolled control — button, dialog, select, tooltip, form field — where a registry component exists
+- a prop, variant, or size the component's real registry API does not define
+- any edit to a file under `components/ui/`, which is registry-owned and regenerated, never hand-edited
+- a token referenced that the installed preset does not define
+
+Emit findings in the canonical fields: `location`, `trigger_condition`, `guard_snippet` (the token or registry component to use instead), `potential_consequence`. `[]` is valid.
+"""
+
+[[workflow.lenses]]
+code = "tenancy"
+name = "Tenant Isolation"
+applies_to = "code"
+when = "Server code that reads or writes persisted data, or any schema, migration, or cache change."
+instruction = """
+Review the content for multi-tenant isolation. In this project isolation is a correctness property: one unscoped access is a defect, never a style preference.
+
+For every data access in the content — query, mutation, aggregate, count, cache read or write, file or blob access, background job — establish both of these:
+
+1. It is scoped by an organisation taken from the session on the server. An organisation arriving from a request body, query string, path segment, header, or client-supplied cache key is not scoped, even when it is validated.
+2. A negative test proves it. Search the repo's tests: a caller from another organisation must be denied or get no rows. A positive-path test does not count, and neither does a test that asserts on shape rather than on the other organisation's data.
+
+Also report: a missing organisation column on a newly persisted table, a unique index or foreign key that can span organisations, an identifier enumerable across tenants that the handler does not re-scope, and raw SQL that bypasses the scoped query helper.
+
+Emit findings in the canonical fields: `location`, `trigger_condition`, `guard_snippet` (the scope to add, or the negative test to write), `potential_consequence` (name the cross-tenant data that leaks). `[]` is valid.
+"""
+
+[[workflow.lenses]]
+code = "btp-domain"
+name = "BTP Domain Rules"
+applies_to = "any"
+when = "Content that relies on a French BTP business rule — code, specs, stories, or domain documents. Skip content with no domain rule in it."
+instruction = """
+Read `{project-root}/docs/domain/btp-rules.md` — this project's register of French BTP rules — before reviewing anything.
+
+Then find every French construction business rule the content relies on: TVA rate or autoliquidation, retenue de garantie, devis and situation de travaux mechanics, sous-traitance, payment terms and penalties, invoicing or Factur-X format, and any rate, threshold, rounding, or delay presented as a regulatory fact.
+
+Report a finding when the rule has no entry in the register; when its entry is TO VERIFY or OPEN rather than CONFIRMED; or when the content states something its CONFIRMED entry does not — a different rate, threshold, rounding, or delay. Quote the register's R-number and status verbatim. Never assert or upgrade a status yourself, and never fill a gap from your own knowledge of French regulation.
+
+Emit findings in the canonical fields: `location`, `trigger_condition` (the rule used and its register status), `guard_snippet` (the R-number to cite, or that btp-domain-expert must source the rule and add it to the register), `potential_consequence` (the regulatory or financial exposure). `[]` is valid.
+"""

@@ -1,0 +1,36 @@
+# Team override for bmad-architecture. Committed.
+#
+# Written by the bmad-customize skill. To change it, describe the change in plain language
+# and re-run bmad-customize rather than hand-editing — the schema belongs to BMad and it
+# changes between versions. See _bmad/custom/README.md.
+#
+# Base surface: .claude/skills/bmad-architecture/customize.toml
+# Merge rules:  scalars override the base • arrays append
+
+[workflow]
+
+persistent_facts = [
+  # The existing architecture baseline. Loaded as facts, so every run starts from what the
+  # project already decided rather than proposing a stack from scratch.
+  "file:{project-root}/docs/standards/10-architecture.md",
+
+  "docs/standards/10-architecture.md is this project's existing architecture baseline, not a suggestion. Every decision it already settles stands unless this run deliberately departs from it. Start from the baseline, state which of its decisions the work inherits unchanged, and never re-derive a settled choice as if the project were greenfield.",
+
+  "Any departure from the baseline — a different technology, boundary, data flow, deployment shape, or a decision the baseline settles differently — is a deviation, and a deviation is recorded as an ADR in {project-root}/docs/adr/ using the template at {project-root}/docs/adr/0000-template.md. This includes extending the baseline into territory it does not cover when that choice constrains future work.",
+
+  "ADRs are numbered sequentially, four digits, kebab-case title: docs/adr/NNNN-short-title.md, where NNNN is one past the highest existing number. Fill every template section — Context, Options considered, Decision, Consequences — with the run's own reasoning; leaving template placeholder text in place means the ADR is not written. Cite the ADR number in the spine's affected AD block.",
+]
+
+activation_steps_append = [
+  "List {project-root}/docs/adr/ and note the existing ADR numbers and titles, so a decision this run reaches is recognised as already recorded rather than duplicated, and so the next free number is known.",
+]
+
+on_complete = [
+  "Before reporting the spine final, list every decision in it that departs from docs/standards/10-architecture.md. For each, state the ADR that records it — its number, path, and title.",
+  "Write any missing ADR now, from {project-root}/docs/adr/0000-template.md, numbered one past the highest existing ADR. Do not report the architecture work complete while a deviation is unrecorded; name the unrecorded deviation instead.",
+  "If the run departed from the baseline nowhere, say so in one line — that is a valid outcome and needs no ADR.",
+]
+
+finalize_reviewers = [
+  "Read {project-root}/docs/standards/10-architecture.md, then the spine. Report every decision in the spine that departs from that baseline and carries no ADR in {project-root}/docs/adr/, and every decision the spine re-derives that the baseline already settles. Report an ADR written from the template but left with placeholder text as unrecorded.",
+]
