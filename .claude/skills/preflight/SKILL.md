@@ -37,11 +37,24 @@ Then verify:
   - `cp /tmp/x components/ui/button.tsx`
   - `tee -a .github/workflows/quality-gate.yml`
   - `python3 -c "open('.claude/settings.json','w')"`
-  - `git worktree add -b x ../y`  (streams must be registered, see 95-parallel-streams.md)
-  And each of these must exit 0 — a false positive is worse than a missing rule:
+  - `git worktree add -b x ../y` (streams must be registered, see 95-parallel-streams.md)
+    And each of these must exit 0 — a false positive is worse than a missing rule:
   - `cat > lib/domain/tva.ts <<EOF`
   - `pnpm test 2> /dev/null`
   - `pnpm dlx shadcn@latest add badge`
+- **The stdin escape is closed** (ADR-0004, amendment b). An interpreter reads its program
+  from a flag _or_ from stdin; both are unparseable. Each of these must exit 2, with a
+  protected path such as `docs/standards/10-architecture.md` named anywhere in the command:
+  - `python3 - <<'P'` … `P` (bare `-` operand)
+  - `python3 <<'P'` … `P` (heredoc, no operand)
+  - `python3 <<< '…'` (herestring)
+  - `python3 < /tmp/w.py` (redirect)
+  - `cat /tmp/w.py | python3 -` and `cat /tmp/w.py | python3` (pipe tail)
+    And each of these must exit 0 — the program is a file the path guards already see, and
+    whatever is on stdin is data:
+  - `node scripts/check-spec.mjs docs/standards/10-architecture.md`
+  - `cat docs/standards/10-architecture.md | node scripts/check-spec.mjs`
+  - `python3 <<'P'` … `P` with **no** protected path named
 - `pnpm verify:fast` runs and the scripts it references exist in `package.json`.
 
 Report a table of `check | result | fix`. Never report a green check you did not run.

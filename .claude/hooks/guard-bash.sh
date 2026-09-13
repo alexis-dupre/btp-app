@@ -40,11 +40,38 @@ $OUT"
 done < <(python3 "$HOOKDIR/path_policy.py" targets "$CMD")
 
 # --- 2. interpreter escapes -------------------------------------------------
-# A one-liner can write anywhere; we cannot parse it, so we refuse the combination of an
-# inline interpreter and a protected path appearing anywhere in the command.
-if printf '%s' "$CMD" | grep -Eq '\b(python3?|node|perl|ruby|osascript)\b[^|;&]*\s-(c|e)\b'; then
+# An interpreter handed a program we cannot parse can write anywhere, so we refuse the
+# combination of such an invocation and a protected path appearing anywhere in the command.
+#
+# A flag is only one of the ways in. The program can equally arrive on **stdin**, which is
+# the same escape with different syntax (ADR-0004, amendment 2026-09-13): a bare `-`
+# operand, a heredoc, a herestring, a `<` redirect, or the interpreter sitting at the tail
+# of a pipe with no operand at all. Four patterns, in order:
+#
+#   INLINE   an inline program:            python3 -c '...'    node -e '...'
+#   STDIN    a program read from stdin:    python3 - <<'P'     node <<'J'    ruby < f
+#   DASH     a bare '-' operand:           cat f | python3 -
+#   PIPED    no operand at the pipe tail:  cat f | python3
+#
+# What must NOT match is an interpreter running a *script file*, whatever is on its stdin:
+# `node scripts/check-spec.mjs`, or `cat data | node scripts/x.mjs < in.txt`. There the
+# program is a file the guards can already see, and the stdin is data.
+INTERP='(python3?|node|perl|ruby|osascript)'
+INLINE="\\b$INTERP\\b[^|;&]*[[:space:]]-(c|e)\\b"
+STDIN="\\b$INTERP\\b[[:space:]]*(-[[:space:]]*)?<"
+DASH="\\b$INTERP\\b[[:space:]]+-([[:space:]]|\$)"
+# '#' counts as a terminator here: with only whitespace between it and the interpreter it
+# can only be starting a comment, which means there is no operand after all.
+PIPED="\\|[[:space:]]*$INTERP\\b[[:space:]]*(\$|[;&|#])"
+
+# Deliberately matched against the FULL command, never the heredoc-stripped one: for
+# `python3 - <<'P'`, the program *is* the heredoc body, so the protected path we need to
+# see sits inside it. Stripping bodies here would reopen the hole this section closes.
+if printf '%s' "$CMD" | grep -Eq "$INLINE|$STDIN|$DASH|$PIPED"; then
   if printf '%s' "$CMD" | grep -Eq '(components/ui/|\.env|\.claude/|\.github/workflows|tsconfig\.json|eslint\.config|vitest\.config|playwright\.config|docs/standards/|pnpm-lock\.yaml|scripts/(verify|loop|stream))'; then
-    block "Refused: an inline interpreter one-liner referencing a protected path.
+    block "Refused: an interpreter reading its program from a flag or from stdin, while
+referencing a protected path. A heredoc, a '-' operand, a '<' redirect and a bare pipe
+tail are all the same escape as '-c'.
 Use the normal tools so the guards can see what you are doing."
   fi
 fi

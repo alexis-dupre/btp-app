@@ -72,7 +72,8 @@ assertions pass unchanged before and after; ten new cases go from 8/10 to 10/10.
 include the two that matter in opposite directions — a banned command _named inside_ a heredoc
 body is now allowed, and a banned command placed _after_ a heredoc terminator is still refused.
 
-**A second, more serious finding, not yet fixed.** While diagnosing this, a write to
+**A second, more serious finding** — described below as it stood, and closed in the amendment
+that follows. While diagnosing this, a write to
 `docs/standards/10-architecture.md` — a protected path — succeeded through
 `python3 - <<'PY'` … `PY`, opening the file from inside the script. Neither guard saw it:
 `targets()` extracts shell redirections and finds none, and section 2 only refuses an inline
@@ -86,3 +87,53 @@ heredoc feeding an interpreter's stdin. It is left open here rather than bundled
 false-positive fix, because widening a refusal and narrowing one should not ride in on the same
 change: one of them makes the guard stricter, and it deserves its own self-test in both
 directions.
+
+## Amendment 2026-09-13 (b) — the stdin escape, closed
+
+Taken as its own change, as the paragraph above asked.
+
+**What was wrong.** Section 2 asked _"was the interpreter given a `-c` or `-e` flag?"_. The
+question it meant to ask is _"is this interpreter running a program the guards cannot see?"_.
+A flag is one answer; **stdin** is the other, and stdin has four surface forms. All four were
+open: a bare `-` operand, a heredoc, a herestring or `<` redirect, and an interpreter sitting
+at the tail of a pipe with no operand at all. Measured before the change, seven hostile
+invocations in these shapes were allowed through to a protected path.
+
+**Remedy.** Section 2 now matches four named patterns — `INLINE`, `STDIN`, `DASH`, `PIPED` —
+against the command. The dividing line is _where the program comes from_, not what is on
+stdin: `node scripts/check-spec.mjs` and `cat data | node scripts/x.mjs < in.txt` are
+untouched, because the program is a file the path guards already see and the stdin is data.
+
+Two properties, as before:
+
+1. **Section 2 scans the FULL command, not the heredoc-stripped one.** For `python3 -` fed by
+   a heredoc, the program _is_ the body, so the protected path to be caught sits inside it.
+   Using the stripped string here would have reopened the hole in the act of closing it. This
+   is the opposite choice from section 3, and deliberately so.
+2. **A trailing `#` closes a pipe tail.** With only whitespace between it and the interpreter
+   it can only begin a comment, so there is no operand after all.
+
+**Verified both directions.** The eleven `/preflight` assertions pass unchanged; the eight
+heredoc cases from amendment (a) still pass; fourteen new section-2 cases go from 7/14 to
+14/14, six of them asserting that a legitimate invocation is still allowed.
+
+**The false-positive cost, stated plainly — it is not zero.** The rule fires on the
+_conjunction_ of an unparseable interpreter program and a protected path string anywhere in
+the command. Four legitimate shapes are now refused that were allowed yesterday:
+
+- reading a protected file for analysis through a heredoc program — the guard does not
+  distinguish read from write;
+- piping a protected file into an interpreter REPL to inspect it;
+- running a generated script from stdin when a protected path appears only in a **comment**;
+- worst of the four: writing a document _with `cat`_ whose body merely **quotes an example**
+  of an interpreter heredoc while naming a protected path. This is amendment (a)'s false
+  positive reappearing in the one section that cannot use the fix, for the reason in
+  property 1 above.
+
+The last one was hit twice while building the self-tests for this very change; the workaround
+is to assemble the literal at runtime, which is exactly the "pre-emptive workaround" the
+policy is supposed to discourage. **Accepted anyway**, because the escape it closes writes to
+protected paths undetected, whereas the cost is paid by a handful of read-only and
+documentation shapes that have an obvious alternative: run the program from a file. If this
+starts firing on ordinary work, narrow it by requiring the protected path to appear _outside_
+any heredoc body fed to a non-interpreter — do not widen `BTP_ALLOW_GATE_EDIT`.
